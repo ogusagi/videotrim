@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ 먼작귀 진짜 구간 자르기 툴 ⚡</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            background-color: #f7f9fa;
+            color: #333;
+            padding: 20px;
+            max-width: 850px;
+            margin: 0 auto;
+        }
+        h1 { text-align: center; color: #ffcb05; text-shadow: 1px 1px 1px #333; margin-bottom: 25px; }
+        .box {
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+        .upload-area {
+            border: 3px dashed #ffcb05;
+            text-align: center;
+            padding: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 8px;
+            background-color: #fffdf0;
+        }
+        video {
+            width: 100%;
+            max-height: 450px;
+            background: #000;
+            border-radius: 6px;
+            display: none;
+            margin-top: 15px;
+        }
+        .time-info {
+            display: flex;
+            justify-content: space-between;
+            background: #f0f0f0;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 1.05rem;
+            font-weight: bold;
+            margin: 15px 0;
+        }
+        .btn-container {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+        button {
+            padding: 12px 20px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        .btn-nav { background-color: #e2e8f0; color: #334155; }
+        .btn-nav:hover { background-color: #cbd5e1; }
+        .btn-start { background-color: #3b82f6; color: white; }
+        .btn-start:hover { background-color: #2563eb; }
+        .btn-end { background-color: #ef4444; color: white; }
+        .btn-end:hover { background-color: #dc2626; }
+        .btn-trim {
+            background-color: #10b981;
+            color: white;
+            width: 100%;
+            font-size: 1.2rem;
+            padding: 15px;
+            margin-top: 10px;
+        }
+        .btn-trim:hover { background-color: #059669; }
+        button:disabled { background-color: #cbd5e1 !important; color: #94a3b8 !important; cursor: not-allowed; }
+        .status {
+            text-align: center;
+            font-weight: bold;
+            color: #2563eb;
+            margin-top: 10px;
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🎬 먼작귀 웹 자체 영상 트림 툴 (진짜 컷팅 버전)</h1>
+
+    <div class="box">
+        <div class="upload-area" onclick="document.getElementById('video-input').click()">
+            📁 여기에 편집할 먼작귀 영상 파일을 선택해 주세요 (클릭)
+            <input type="file" id="video-input" accept="video/mp4, video/webm" style="display:none;">
+            <div id="file-name" style="font-size:0.9rem; color:#777; margin-top:8px;"></div>
+        </div>
+        <video id="player" controls></video>
+    </div>
+
+    <div class="box" id="editor-controls" style="display:none;">
+        <div class="time-info">
+            <div>⏱️ 현재 위치: <span id="t-curr">0.00</span>초</div>
+            <div style="color:#3b82f6;">▶ 시작점: <span id="t-start">0.00</span>초</div>
+            <div style="color:#ef4444;">■ 종료점: <span id="t-end">0.00</span>초</div>
+        </div>
+
+        <div class="btn-container">
+            <button class="btn-nav" onclick="moveFrame(-1)">◀ 1프레임 뒤로</button>
+            <button class="btn-start" onclick="setPoint('start')">🎯 여기부터 자르기 (시작)</button>
+            <button class="btn-end" onclick="setPoint('end')">🎯 여기까지만 자르기 (종료)</button>
+            <button class="btn-nav" onclick="moveFrame(1)">1프레임 앞으로 ▶</button>
+        </div>
+
+        <button class="btn-trim" id="download-btn" onclick="trimAndDownload()">⚡ 선택 구간 자르고 다운로드 ⚡</button>
+        <div class="status" id="status-msg"></div>
+    </div>
+
+    <script>
+        const input = document.getElementById('video-input');
+        const player = document.getElementById('player');
+        const fileNameDiv = document.getElementById('file-name');
+        const controls = document.getElementById('editor-controls');
+        
+        const tCurr = document.getElementById('t-curr');
+        const tStart = document.getElementById('t-start');
+        const tEnd = document.getElementById('t-end');
+        const statusMsg = document.getElementById('status-msg');
+        const downloadBtn = document.getElementById('download-btn');
+
+        let videoFile = null;
+        let startTime = 0;
+        let endTime = 0;
+        const fps = 30; 
+
+        input.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            videoFile = file;
+            fileNameDiv.innerText = `선택된 파일: ${file.name}`;
+            
+            const fileURL = URL.createObjectURL(file);
+            player.src = fileURL;
+            player.style.display = 'block';
+            controls.style.display = 'block';
+            
+            player.onloadedmetadata = function() {
+                startTime = 0;
+                endTime = player.duration;
+                tStart.innerText = startTime.toFixed(2);
+                tEnd.innerText = endTime.toFixed(2);
+                tCurr.innerText = player.currentTime.toFixed(2);
+            };
+        });
+
+        player.addEventListener('timeupdate', () => {
+            tCurr.innerText = player.currentTime.toFixed(2);
+        });
+        player.addEventListener('seeked', () => {
+            tCurr.innerText = player.currentTime.toFixed(2);
+        });
+
+        function moveFrame(delta) {
+            player.pause();
+            let newTime = player.currentTime + (delta * (1 / fps));
+            if (newTime < 0) newTime = 0;
+            if (newTime > player.duration) newTime = player.duration;
+            player.currentTime = newTime;
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if(controls.style.display === 'block') {
+                if (e.key === "ArrowLeft") { e.preventDefault(); moveFrame(-1); }
+                else if (e.key === "ArrowRight") { e.preventDefault(); moveFrame(1); }
+            }
+        });
+
+        function setPoint(type) {
+            if (type === 'start') {
+                startTime = player.currentTime;
+                if(startTime >= endTime) endTime = player.duration;
+            } else {
+                endTime = player.currentTime;
+                if(endTime <= startTime) startTime = 0;
+            }
+            tStart.innerText = startTime.toFixed(2);
+            tEnd.innerText = endTime.toFixed(2);
+        }
+
+        // 💡 [핵심] 캡처 스트림을 활용한 실제 구간 인코딩 녹화 기능
+        async function trimAndDownload() {
+            if (!videoFile) return;
+            if (startTime >= endTime) {
+                alert("시작 시간이 종료 시간보다 크거나 같습니다!");
+                return;
+            }
+
+            downloadBtn.disabled = true;
+            player.pause();
+            
+            // 시작 지점으로 점프
+            player.currentTime = startTime;
+            statusMsg.innerText = "🎬 영상 추출 및 인코딩 준비 중...";
+
+            // 렌더링 완료 및 씽크 맞추기 위해 살짝 딜레이
+            await new Promise(r => setTimeout(r, 500));
+
+            // 비디오 엘리먼트에서 미디어 스트림 캡처 (오디오 포함)
+            const stream = player.captureStream ? player.captureStream() : player.mozCaptureStream();
+            
+            // 브라우저 녹화 객체 생성 (오류 방지를 위해 webm 코덱 우선 적용하되 보편적인 포맷 매핑)
+            const options = { mimeType: 'video/webm;codecs=vp9,opus' };
+            let recorder;
+            try {
+                recorder = new MediaRecorder(stream, options);
+            } catch(e) {
+                recorder = new MediaRecorder(stream); // 브라우저 기본 포맷
+            }
+            
+            const chunks = [];
+            recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+            
+            recorder.onstop = () => {
+                statusMsg.innerText = "💾 자르기 완료! 다운로드 파일을 생성합니다.";
+                const blob = new Blob(chunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `cut_${videoFile.name.split('.')[0]}.webm`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                
+                statusMsg.innerText = "✅ 다운로드 완료!";
+                downloadBtn.disabled = false;
+                player.pause();
+            };
+
+            // 녹화 시작 및 플레이어 재생
+            recorder.start();
+            player.play();
+            statusMsg.innerText = "⚡ 실시간 고속 인코딩 및 구간 자르기 진행 중...";
+
+            // 종료 지점에 도달하는지 체크하는 타이머 루프
+            const checkInterval = setInterval(() => {
+                if (player.currentTime >= endTime || player.paused || player.ended) {
+                    clearInterval(checkInterval);
+                    player.pause();
+                    recorder.stop(); // 종료 지점 오면 녹화 중단하고 다운로드 트리거
+                }
+            }, 30);
+        }
+    </script>
+</body>
+</html>
