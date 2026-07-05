@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>영상 용량 줄이기</title>
+<style>
+  :root {
+    --bg: #101211;
+    --panel: #171a19;
+    --panel-2: #1e2221;
+    --line: #2a2f2d;
+    --ink: #eef1ee;
+    --ink-dim: #9aa39d;
+    --accent: #5ee6a8;
+    --accent-dim: #2f5c48;
+    --warn: #e6b85e;
+    --mono: 'SF Mono', 'Roboto Mono', Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', 'Apple SD Gothic Neo', 'Segoe UI', sans-serif;
+    min-height: 100vh;
+  }
+  .wrap {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+  }
+  header {
+    margin-bottom: 32px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  h1 {
+    font-size: 26px;
+    font-weight: 700;
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+  }
+  .sub {
+    color: var(--ink-dim);
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+
+  .drop {
+    border: 1.5px dashed var(--line);
+    border-radius: 12px;
+    padding: 36px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .drop:hover, .drop.drag {
+    border-color: var(--accent);
+    background: rgba(94, 230, 168, 0.04);
+  }
+  .drop-icon {
+    font-size: 28px;
+    margin-bottom: 10px;
+    opacity: 0.85;
+  }
+  .drop-main {
+    font-size: 14px;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+  .drop-sub {
+    font-size: 12px;
+    color: var(--ink-dim);
+  }
+  input[type=file] { display: none; }
+
+  .filerow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    font-size: 13px;
+  }
+  .filerow .name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .filerow .size {
+    color: var(--ink-dim);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .filerow .x {
+    cursor: pointer;
+    color: var(--ink-dim);
+    padding: 2px 6px;
+  }
+  .filerow .x:hover { color: var(--ink); }
+
+  .section-title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin: 0 0 14px;
+  }
+
+  .bitrate-line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .bitrate-value {
+    font-family: var(--mono);
+    font-size: 22px;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .bitrate-label {
+    font-size: 12px;
+    color: var(--ink-dim);
+  }
+  .hint {
+    font-size: 12px;
+    color: var(--ink-dim);
+    line-height: 1.6;
+    margin-top: 10px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
+  .hint b { color: var(--ink); font-weight: 600; }
+
+  select, .preset-row {
+    width: 100%;
+  }
+  .preset-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .preset-btn {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--ink-dim);
+    border-radius: 8px;
+    padding: 10px 8px;
+    font-size: 12.5px;
+    cursor: pointer;
+    text-align: center;
+    transition: all .12s ease;
+  }
+  .preset-btn:hover { border-color: var(--ink-dim); color: var(--ink); }
+  .preset-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(94, 230, 168, 0.06);
+  }
+
+  .go-btn {
+    width: 100%;
+    padding: 15px;
+    border: none;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #08130f;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity .12s ease, transform .1s ease;
+  }
+  .go-btn:hover:not(:disabled) { opacity: 0.92; }
+  .go-btn:active:not(:disabled) { transform: scale(0.99); }
+  .go-btn:disabled {
+    background: var(--panel-2);
+    color: var(--ink-dim);
+    cursor: not-allowed;
+  }
+
+  .progress-wrap { display: none; }
+  .progress-wrap.show { display: block; }
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12.5px;
+    color: var(--ink-dim);
+    margin-bottom: 8px;
+    font-family: var(--mono);
+  }
+  .progress-track {
+    height: 8px;
+    background: var(--panel-2);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+    border-radius: 99px;
+    transition: width .2s ease;
+  }
+  .progress-msg {
+    font-size: 12px;
+    color: var(--ink-dim);
+    margin-top: 10px;
+    font-family: var(--mono);
+    min-height: 16px;
+  }
+
+  .result { display: none; }
+  .result.show { display: block; }
+  .result-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .stat {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 10px;
+    text-align: center;
+  }
+  .stat .num {
+    font-family: var(--mono);
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .stat.reduce .num { color: var(--accent); }
+  .stat .lbl {
+    font-size: 10.5px;
+    color: var(--ink-dim);
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  video.preview {
+    width: 100%;
+    border-radius: 10px;
+    background: #000;
+    margin-bottom: 16px;
+    display: block;
+  }
+  .download-btn {
+    display: block;
+    width: 100%;
+    text-align: center;
+    padding: 15px;
+    border-radius: 10px;
+    background: var(--ink);
+    color: #08130f;
+    font-weight: 700;
+    font-size: 15px;
+    text-decoration: none;
+  }
+  .download-btn:hover { opacity: 0.9; }
+
+  .err {
+    display: none;
+    background: rgba(230, 120, 94, 0.08);
+    border: 1px solid rgba(230, 120, 94, 0.35);
+    color: #f0a894;
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+  .err.show { display: block; }
+
+  footer {
+    text-align: center;
+    color: var(--ink-dim);
+    font-size: 11.5px;
+    margin-top: 28px;
+    line-height: 1.7;
+  }
+
+  @media (max-width: 480px) {
+    .wrap { padding: 28px 16px 60px; }
+    h1 { font-size: 22px; }
+    .result-stats { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Video · Compress</div>
+    <h1>영상 용량 줄이기</h1>
+    <p class="sub">해상도는 그대로 두고, 비트레이트만 적정 수준으로 낮춰서 용량을 줄여요. 화질 차이는 거의 없이 파일 크기만 확 줄어듭니다. 모든 처리는 이 브라우저 안에서만 일어나고, 파일은 서버로 전송되지 않아요.</p>
+  </header>
+  
+
+  <div class="card">
+    <div class="section-title">1. 영상 선택</div>
+    <div class="drop" id="drop">
+      <div class="drop-icon">📹</div>
+      <div class="drop-main">탭하거나 파일을 끌어다 놓으세요</div>
+      <div class="drop-sub">MP4, MOV 등 대부분의 영상 형식 지원</div>
+    </div>
+    <input type="file" id="fileInput" accept="video/*" />
+    <div id="fileInfo" style="margin-top:12px; display:none;">
+      <div class="filerow">
+        <span class="name" id="fileName"></span>
+        <span class="size" id="fileSize"></span>
+        <span class="x" id="clearFile">✕</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">2. 압축 강도</div>
+    <div class="preset-row" id="presetRow">
+      <div class="preset-btn" data-bitrate="10">가볍게<br><span style="opacity:.7">10 Mbps</span></div>
+      <div class="preset-btn active" data-bitrate="6">권장<br><span style="opacity:.7">6 Mbps</span></div>
+      <div class="preset-btn" data-bitrate="3.5">최대<br><span style="opacity:.7">3.5 Mbps</span></div>
+    </div>
+    <div class="hint">
+      <b>권장(6Mbps)</b>이 FHD(1080p) 영상 기준 화질 차이가 거의 안 느껴지면서 용량은 크게 줄어드는 지점이에요. 스마트폰 원본은 보통 20~50Mbps로 촬영되기 때문에, 대부분의 경우 6Mbps로도 충분합니다. 해상도가 4K라면 "가볍게"를 권장해요.
+    </div>
+  </div>
+
+  <button class="go-btn" id="goBtn" disabled>영상을 먼저 선택하세요</button>
+
+  <div class="card progress-wrap" id="progressCard">
+    <div class="progress-label">
+      <span id="progressStage">준비 중…</span>
+      <span id="progressPct">0%</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-msg" id="progressMsg"></div>
+  </div>
+
+  <div class="err" id="errBox"></div>
+
+  <div class="card result" id="resultCard">
+    <div class="section-title">완료</div>
+    <video class="preview" id="previewVideo" controls></video>
+    <div class="result-stats">
+      <div class="stat">
+        <div class="num" id="origSize">-</div>
+        <div class="lbl">원본</div>
+      </div>
+      <div class="stat">
+        <div class="num" id="newSize">-</div>
+        <div class="lbl">압축 후</div>
+      </div>
+      <div class="stat reduce">
+        <div class="num" id="reducePct">-</div>
+        <div class="lbl">용량 감소</div>
+      </div>
+    </div>
+    <a class="download-btn" id="downloadBtn" download="compressed.mp4">파일 다운로드</a>
+  </div>
+
+  <footer>
+    ffmpeg.wasm(브라우저 내 처리) 기반 · 파일은 어디에도 업로드되지 않아요<br>
+    처음 실행 시 엔진 로드에 10~20초 정도 걸릴 수 있어요
+  </footer>
+</div>
+
+<script type="module">
+import { FFmpeg } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js';
+import { fetchFile, toBlobURL } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js';
+
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('fileInput');
+const fileInfo = document.getElementById('fileInfo');
+const fileName = document.getElementById('fileName');
+const fileSize = document.getElementById('fileSize');
+const clearFile = document.getElementById('clearFile');
+const goBtn = document.getElementById('goBtn');
+const presetRow = document.getElementById('presetRow');
+const progressCard = document.getElementById('progressCard');
+const progressStage = document.getElementById('progressStage');
+const progressPct = document.getElementById('progressPct');
+const progressFill = document.getElementById('progressFill');
+const progressMsg = document.getElementById('progressMsg');
+const errBox = document.getElementById('errBox');
+const resultCard = document.getElementById('resultCard');
+const previewVideo = document.getElementById('previewVideo');
+const origSizeEl = document.getElementById('origSize');
+const newSizeEl = document.getElementById('newSize');
+const reducePctEl = document.getElementById('reducePct');
+const downloadBtn = document.getElementById('downloadBtn');
+
+let selectedFile = null;
+let selectedBitrate = 6; // Mbps
+let ffmpeg = null;
+let ffmpegLoaded = false;
+let objectUrlsToRevoke = [];
+
+function fmtSize(bytes) {
+  if (bytes >= 1024 * 1024 * 1024) return (bytes / (1024*1024*1024)).toFixed(2) + ' GB';
+  return (bytes / (1024*1024)).toFixed(1) + ' MB';
+}
+
+function showError(msg) {
+  errBox.textContent = msg;
+  errBox.classList.add('show');
+}
+function clearError() {
+  errBox.classList.remove('show');
+  errBox.textContent = '';
+}
+
+function setPreset(bitrate, el) {
+  selectedBitrate = bitrate;
+  [...presetRow.children].forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+
+presetRow.addEventListener('click', (e) => {
+  const btn = e.target.closest('.preset-btn');
+  if (!btn) return;
+  setPreset(parseFloat(btn.dataset.bitrate), btn);
+});
+
+drop.addEventListener('click', () => fileInput.click());
+drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('drag'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
+drop.addEventListener('drop', (e) => {
+  e.preventDefault();
+  drop.classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f) handleFile(f);
+});
+fileInput.addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  if (f) handleFile(f);
+});
+clearFile.addEventListener('click', (e) => {
+  e.stopPropagation();
+  selectedFile = null;
+  fileInput.value = '';
+  fileInfo.style.display = 'none';
+  drop.style.display = 'block';
+  goBtn.disabled = true;
+  goBtn.textContent = '영상을 먼저 선택하세요';
+  resultCard.classList.remove('show');
+  clearError();
+});
+
+function handleFile(f) {
+  if (!f.type.startsWith('video/')) {
+    showError('영상 파일만 선택할 수 있어요.');
+    return;
+  }
+  clearError();
+  selectedFile = f;
+  fileName.textContent = f.name;
+  fileSize.textContent = fmtSize(f.size);
+  fileInfo.style.display = 'block';
+  drop.style.display = 'none';
+  goBtn.disabled = false;
+  goBtn.textContent = '용량 줄이기 시작';
+  resultCard.classList.remove('show');
+}
+
+async function loadFFmpeg() {
+  if (ffmpegLoaded) return;
+  ffmpeg = new FFmpeg();
+  ffmpeg.on('log', ({ message }) => {
+    progressMsg.textContent = message.slice(0, 90);
+  });
+  ffmpeg.on('progress', ({ progress }) => {
+    const pct = Math.min(100, Math.max(0, Math.round(progress * 100)));
+    progressFill.style.width = pct + '%';
+    progressPct.textContent = pct + '%';
+  });
+
+  const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd';
+  progressStage.textContent = '압축 엔진 불러오는 중…';
+  await ffmpeg.load({
+    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+  });
+  ffmpegLoaded = true;
+}
+
+goBtn.addEventListener('click', async () => {
+  if (!selectedFile) return;
+  clearError();
+  resultCard.classList.remove('show');
+  goBtn.disabled = true;
+  progressCard.classList.add('show');
+  progressFill.style.width = '0%';
+  progressPct.textContent = '0%';
+  progressStage.textContent = '준비 중…';
+  progressMsg.textContent = '';
+
+  try {
+    await loadFFmpeg();
+
+    progressStage.textContent = '영상 압축 중…';
+
+    const inputName = 'input' + (selectedFile.name.match(/\.\w+$/)?.[0] || '.mp4');
+    const outputName = 'output.mp4';
+
+    await ffmpeg.writeFile(inputName, await fetchFile(selectedFile));
+
+    const bitrateKbps = Math.round(selectedBitrate * 1000);
+    const bufsizeKbps = Math.round(bitrateKbps * 2);
+
+    await ffmpeg.exec([
+      '-i', inputName,
+      '-c:v', 'libx264',
+      '-b:v', `${bitrateKbps}k`,
+      '-maxrate', `${bitrateKbps}k`,
+      '-bufsize', `${bufsizeKbps}k`,
+      '-preset', 'veryfast',
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      '-movflags', '+faststart',
+      outputName
+    ]);
+
+    const data = await ffmpeg.readFile(outputName);
+    const blob = new Blob([data.buffer], { type: 'video/mp4' });
+    const url = URL.createObjectURL(blob);
+    objectUrlsToRevoke.forEach(u => URL.revokeObjectURL(u));
+    objectUrlsToRevoke = [url];
+
+    previewVideo.src = url;
+    origSizeEl.textContent = fmtSize(selectedFile.size);
+    newSizeEl.textContent = fmtSize(blob.size);
+    const reduction = Math.max(0, Math.round((1 - blob.size / selectedFile.size) * 100));
+    reducePctEl.textContent = (blob.size < selectedFile.size ? '-' : '+') + Math.abs(reduction) + '%';
+
+    const baseName = selectedFile.name.replace(/\.\w+$/, '');
+    downloadBtn.href = url;
+    downloadBtn.download = `${baseName}_compressed.mp4`;
+
+    resultCard.classList.add('show');
+    progressStage.textContent = '완료';
+    progressPct.textContent = '100%';
+    progressFill.style.width = '100%';
+
+  } catch (err) {
+    console.error(err);
+    showError('압축 중 문제가 발생했어요: ' + (err?.message || err));
+  } finally {
+    goBtn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
