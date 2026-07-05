@@ -495,11 +495,13 @@ async function loadFFmpeg() {
     progressPct.textContent = pct + '%';
   });
 
-  const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd';
+  const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm';
+  const ffmpegBaseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm';
   progressStage.textContent = '압축 엔진 불러오는 중…';
   await ffmpeg.load({
     coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
     wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+    classWorkerURL: await toBlobURL(`${ffmpegBaseURL}/worker.js`, 'text/javascript'),
   });
   ffmpegLoaded = true;
 }
