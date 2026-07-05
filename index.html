@@ -191,9 +191,7 @@
         <div class="status" id="status-msg"></div>
     </div>
 
-    <!-- ffmpeg.wasm (single-thread core, no cross-origin-isolation required) -->
-    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.min.js"></script>
+    <!-- ffmpeg.wasm은 아래 스크립트에서 동적으로 로드합니다 (로드 실패 시 원인을 화면에 표시하기 위함) -->
     <script>
         const input = document.getElementById('video-input');
         const player = document.getElementById('player');
@@ -227,6 +225,35 @@
             modeDesc.innerText = MODE_DESCRIPTIONS[m];
         }
 
+        // ---- 스크립트 동적 로더 (여러 CDN 순차 폴백) ----
+        function loadScriptOnce(url) {
+            return new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = url;
+                s.onload = () => resolve(url);
+                s.onerror = () => reject(new Error(`스크립트 로드 실패: ${url}`));
+                document.head.appendChild(s);
+            });
+        }
+
+        async function loadFromCandidates(candidates, checkFn, label) {
+            let lastErr = null;
+            for (const url of candidates) {
+                try {
+                    await loadScriptOnce(url);
+                    // 스크립트 태그의 onload는 실행 완료를 보장하지 않을 수 있어 짧게 재확인
+                    for (let i = 0; i < 20; i++) {
+                        if (checkFn()) return url;
+                        await new Promise(r => setTimeout(r, 100));
+                    }
+                    lastErr = new Error(`${label} 로드는 됐지만 전역 객체를 찾을 수 없음: ${url}`);
+                } catch (e) {
+                    lastErr = e;
+                }
+            }
+            throw lastErr || new Error(`${label}를 로드할 수 있는 CDN이 없습니다.`);
+        }
+
         // ---- FFmpeg 인스턴스 (지연 로딩: 처음 자르기 누를 때 로드) ----
         let ffmpeg = null;
         let ffmpegLoaded = false;
@@ -234,11 +261,34 @@
         async function ensureFFmpeg() {
             if (ffmpegLoaded) return ffmpeg;
 
-            statusMsg.innerText = '🔧 변환 엔진(FFmpeg.wasm) 최초 로딩 중... (약 20~30MB, 몇 초 소요)';
+            statusMsg.innerText = '🔧 변환 엔진(FFmpeg.wasm) 스크립트 불러오는 중...';
 
-            // UMD 빌드는 전역 FFmpeg 객체를 노출합니다 (FFmpeg.FFmpeg가 실제 클래스)
-            const { FFmpeg: FFmpegClass } = FFmpeg;
-            const { toBlobURL } = FFmpegUtil;
+            // 1) @ffmpeg/ffmpeg UMD 로드 (jsDelivr 실패 시 unpkg, cdnjs 순으로 폴백)
+            await loadFromCandidates(
+                [
+                    'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.min.js',
+                    'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.min.js',
+                    'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.12.10/umd/ffmpeg.min.js'
+                ],
+                () => typeof window.FFmpeg !== 'undefined' && typeof window.FFmpeg.FFmpeg === 'function',
+                'FFmpeg 코어 라이브러리'
+            );
+
+            // 2) @ffmpeg/util UMD 로드 (toBlobURL 제공)
+            await loadFromCandidates(
+                [
+                    'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.min.js',
+                    'https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.min.js',
+                    'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg-util/0.12.1/umd/index.min.js'
+                ],
+                () => typeof window.FFmpegUtil !== 'undefined' && typeof window.FFmpegUtil.toBlobURL === 'function',
+                'FFmpeg 유틸리티(toBlobURL)'
+            );
+
+            statusMsg.innerText = '🔧 변환 엔진(FFmpeg.wasm) 초기화 중... (약 20~30MB, 몇 초 소요)';
+
+            const FFmpegClass = window.FFmpeg.FFmpeg;
+            const toBlobURL = window.FFmpegUtil.toBlobURL;
             ffmpeg = new FFmpegClass();
 
             ffmpeg.on('log', ({ message }) => {
