@@ -314,6 +314,7 @@
       </div>
     </div>
     <a class="download-btn" id="downloadBtn" download="compressed.webm">파일 다운로드</a>
+    <div id="formatNote" style="text-align:center; font-size:11.5px; color:var(--ink-dim); margin-top:10px;"></div>
   </div>
 
   <footer>
@@ -426,11 +427,12 @@ function handleFile(f) {
 
 function pickMimeType() {
   const candidates = [
+    'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+    'video/mp4;codecs=avc1',
+    'video/mp4',
     'video/webm;codecs=vp9,opus',
     'video/webm;codecs=vp8,opus',
     'video/webm',
-    'video/mp4;codecs=avc1',
-    'video/mp4',
   ];
   for (const c of candidates) {
     if (window.MediaRecorder && MediaRecorder.isTypeSupported(c)) return c;
@@ -535,6 +537,8 @@ goBtn.addEventListener('click', async () => {
     const ext = outputType.includes('mp4') ? 'mp4' : 'webm';
     downloadBtn.href = url;
     downloadBtn.download = `${baseName}_compressed.${ext}`;
+    document.getElementById('formatNote').textContent =
+      ext === 'mp4' ? 'MP4(H.264) 형식 · 대부분 기기에서 재생 가능' : 'WebM(VP9) 형식 · 아이폰 사파리에서는 재생이 안 될 수 있어요';
 
     resultCard.classList.add('show');
     progressStage.textContent = '완료';
